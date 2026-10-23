@@ -1,0 +1,29 @@
+#!/bin/sh
+# Codesign wrapper for projects stored in iCloud Desktop / Documents.
+#
+# macOS stamps new bundles with com.apple.FinderInfo and a file-provider
+# attribute. codesign then exits with "resource fork, Finder information, or
+# similar detritus not allowed" (status 255). Flutter only clears those
+# attributes on the Mach-O file, not on the .framework directory that
+# actually carries them.
+#
+# This sits ahead of /usr/bin/codesign on PATH for the Xcode Flutter scripts.
+
+for arg in "$@"; do
+  case "$arg" in
+    -*) continue ;;
+  esac
+  dir=$(dirname "$arg")
+  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+    case "$(basename "$dir")" in
+      *.framework)
+        xattr -r -d com.apple.FinderInfo "$dir" 2>/dev/null || true
+        xattr -d com.apple.FinderInfo "$dir" 2>/dev/null || true
+        xattr -d 'com.apple.fileprovider.fpfs#P' "$dir" 2>/dev/null || true
+        ;;
+    esac
+    dir=$(dirname "$dir")
+  done
+done
+
+exec /usr/bin/codesign "$@"
